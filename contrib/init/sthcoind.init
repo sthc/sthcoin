@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+#
+#  sthcoind The sthcoin core server.
+#
+#
+# chkconfig: 345 80 20
+# description: sthcoind
+# processname: sthcoind
+#
+
+# Source function library.
+. /etc/init.d/functions
+
+# you can override defaults in /etc/sysconfig/sthcoind, see below
+if [ -f /etc/sysconfig/sthcoind ]; then
+        . /etc/sysconfig/sthcoind
+fi
+
+RETVAL=0
+
+prog=sthcoind
+# you can override the lockfile via STHCOIND_LOCKFILE in /etc/sysconfig/sthcoind
+lockfile=${STHCOIND_LOCKFILE-/var/lock/subsys/sthcoind}
+
+# sthcoind defaults to /usr/bin/sthcoind, override with STHCOIND_BIN
+sthcoind=${STHCOIND_BIN-/usr/bin/sthcoind}
+
+# sthcoind opts default to -disablewallet, override with STHCOIND_OPTS
+sthcoind_opts=${STHCOIND_OPTS--disablewallet}
+
+start() {
+    echo -n $"Starting $prog: "
+    daemon $DAEMONOPTS $sthcoind $sthcoind_opts
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch $lockfile
+    return $RETVAL
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    killproc $prog
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f $lockfile
+    return $RETVAL
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status $prog
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: service $prog {start|stop|status|restart}"
+        exit 1
+        ;;
+esac

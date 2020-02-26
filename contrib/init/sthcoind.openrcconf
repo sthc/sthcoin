@@ -1,0 +1,33 @@
+# /etc/conf.d/sthcoind: config file for /etc/init.d/sthcoind
+
+# Config file location
+#STHCOIND_CONFIGFILE="/etc/sthcoin/sthcoin.conf"
+
+# What directory to write pidfile to?  (created and owned by $STHCOIND_USER)
+#STHCOIND_PIDDIR="/var/run/sthcoind"
+
+# What filename to give the pidfile
+#STHCOIND_PIDFILE="${STHCOIND_PIDDIR}/sthcoind.pid"
+
+# Where to write sthcoind data (be mindful that the blockchain is large)
+#STHCOIND_DATADIR="/var/lib/sthcoind"
+
+# User and group to own sthcoind process
+#STHCOIND_USER="sthcoin"
+#STHCOIND_GROUP="sthcoin"
+
+# Path to sthcoind executable
+#STHCOIND_BIN="/usr/bin/sthcoind"
+
+# Nice value to run sthcoind under
+#STHCOIND_NICE=0
+
+# Additional options (avoid -conf and -datadir, use flags above)
+#STHCOIND_OPTS=""
+
+# The timeout in seconds OpenRC will wait for sthcoind to terminate
+# after a SIGTERM has been raised.
+# Note that this will be mapped as argument to start-stop-daemon's
+# '--retry' option, which means you can specify a retry schedule
+# here. For more information see man 8 start-stop-daemon.
+STHCOIND_SIGTERM_TIMEOUT=60
