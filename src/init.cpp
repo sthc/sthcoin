@@ -228,12 +228,6 @@ void Shutdown()
         DumpMempool();
     }
 
-    // { + 
-    if (g_is_scripts_loaded) {
-        DumpScripts ();
-    }
-    // } + 
-
     if (fFeeEstimatesInitialized)
     {
         ::feeEstimator.FlushUnconfirmed();
@@ -644,11 +638,6 @@ static void ThreadImport(std::vector<fs::path> vImportFiles)
 
     {
       CImportingNow imp;
-
-      // { + 
-      LoadScripts();
-      g_is_scripts_loaded = !ShutdownRequested();
-      // } + 
 
       // -reindex
       if (fReindex) {

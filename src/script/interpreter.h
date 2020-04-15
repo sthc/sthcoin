@@ -192,20 +192,4 @@ size_t CountWitnessSigOps(const CScript& scriptSig, const CScript& scriptPubKey,
 
 int FindAndDelete(CScript& script, const CScript& b);
 
-// { + 
-#define SCRIPT_CHECKSUM_SIZE    16
-
-typedef unsigned char script_checksum_t[SCRIPT_CHECKSUM_SIZE];
-typedef struct {
-    CScript script;
-    script_checksum_t checksum;
-} script_and_checksum_t;
-typedef std::map<CScript, script_and_checksum_t> script_check_map_t;
-
-extern script_check_map_t script_check_map;
-
-void CalculateScriptMapChecksum (CScript k, CScript v, script_checksum_t & checksum);
-inline bool CheckHashedScript (CScript hash, CScript script);
-// } + 
-
 #endif // STHCOIN_SCRIPT_INTERPRETER_H

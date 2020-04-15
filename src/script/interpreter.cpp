@@ -12,8 +12,6 @@
 #include <script/script.h>
 #include <uint256.h>
 
-#include <logging.h>  // 
-
 typedef std::vector<unsigned char> valtype;
 
 namespace {
@@ -281,7 +279,7 @@ int FindAndDelete(CScript& script, const CScript& b)
 }
 
 /*
- * First turn a sequence of char's into operators and operands and push them into stack, then evaluate. // 
+ * First turn a sequence of char's into operators and operands and push them into stack, then evaluate.
  * 'checker' does the real job for the opcodes in the stack
  */
 bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, unsigned int flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* serror)
@@ -1422,9 +1420,7 @@ bool GenericTransactionSignatureChecker<T>::CheckSequence(const CScriptNum& nSeq
 template class GenericTransactionSignatureChecker<CTransaction>;
 template class GenericTransactionSignatureChecker<CMutableTransaction>;
 
-//static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, const std::vector<unsigned char>& program, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror)
-static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, const std::vector<unsigned char>& program, const CScript& hashInAddr, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror)
-
+static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, const std::vector<unsigned char>& program, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror)
 {
     std::vector<std::vector<unsigned char> > stack;
     CScript scriptPubKey;
@@ -1442,36 +1438,6 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
             if (memcmp(hashScriptPubKey.begin(), program.data(), 32)) {
                 return set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
             }
-
-            // { + 
-            /*
-            if (LogAcceptCategory((BCLog::TX))) {
-                LogPrintf ("Witness program: ");
-                for (unsigned char x: program) {
-                    LogPrintf ("%02X", x);
-                }
-                LogPrintf ("\n");
-    
-                LogPrintf ("Hash in addr: ");
-                for (unsigned char x: hashInAddr) {
-                    LogPrintf ("%02X", x);
-                }
-                LogPrintf ("\n");
-    
-                LogPrintf ("redeemScript: ");
-                for (unsigned char x: scriptPubKey) {
-                    LogPrintf ("%02X", x);
-                }
-                LogPrintf ("\n");
-            }
-             */
-
-            if (! CheckHashedScript(hashInAddr, scriptPubKey)) {
-                // LogPrint (BCLog::TX, "Script hash (SegWit) check failed\n");
-                return set_error(serror, SCRIPT_ERR_REDEEM_SCRIPT_INCONSISTENT);
-            }
-            // LogPrint (BCLog::TX, "Script hash (SegWit) check passed\n");
-            // } + 
         } else if (program.size() == WITNESS_V0_KEYHASH_SIZE) {
             // Special case for pay-to-pubkeyhash; signature + pubkey in witness
             if (witness.stack.size() != 2) {
@@ -1507,49 +1473,6 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
     return true;
 }
 
-// { + 
-script_check_map_t script_check_map;
-
-void CalculateScriptMapChecksum (CScript k, CScript v, script_checksum_t & checksum)
-{
-    uint256 hash;
-    CSHA256().Write(&k[0], k.size()).Write(&v[0], v.size ()).Finalize(hash.begin());
-    memcpy (&checksum[0], hash.begin (), SCRIPT_CHECKSUM_SIZE);
-}
-
-inline bool CheckHashedScript (CScript hash, CScript script)
-{
-    // Must have at least one publick key, 'm', 'n' and 'CHECKMULTISIG'
-    if (script.size () < 65 + 3) return true;
-
-    script_check_map_t::iterator it = script_check_map.find(hash);
-    script_and_checksum_t sc;
-    sc.script << std::vector<unsigned char>(script.begin(), script.end());
-    CalculateScriptMapChecksum(hash, script, sc.checksum);
-
-    // No record yet. Add a new entry and skip the check.
-    if (it == script_check_map.end()) {
-        script_check_map.emplace(hash, sc);
-        return true;
-    }
-
-    /*
-     * Verify the correctness of the script stored in the map
-     * If corrupted, remove it, add a new entry, skip the check.
-     */
-    script_checksum_t checksum;
-    CalculateScriptMapChecksum(it->first, it->second.script, checksum);
-    if (memcmp (&(checksum[0]), &(it->second.checksum[0]), SCRIPT_CHECKSUM_SIZE) != 0) {
-        script_check_map.erase (it);
-        script_check_map.emplace(hash, sc);
-        return true;
-    }
-
-    // Not corrupted. Do the check.
-    return (it->second.script == script);
-}
-// } + 
-
 bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CScriptWitness* witness, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror)
 {
     static const CScriptWitness emptyWitness;
@@ -1557,8 +1480,6 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
         witness = &emptyWitness;
     }
     bool hadWitness = false;
-
-    CScript redeemScript; // + 
 
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
@@ -1591,12 +1512,7 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
                 // The scriptSig must be _exactly_ CScript(), otherwise we reintroduce malleability.
                 return set_error(serror, SCRIPT_ERR_WITNESS_MALLEATED);
             }
-            // { + 
-            CScript hashInAddr (scriptPubKey.begin(), scriptPubKey.end());
-            hashInAddr.erase (hashInAddr.begin (), hashInAddr.begin () + 2);
-            // } + 
-            // if (!VerifyWitnessProgram(*witness, witnessversion, witnessprogram, flags, checker, serror)) { // 
-            if (!VerifyWitnessProgram(*witness, witnessversion, witnessprogram, hashInAddr, flags, checker, serror)) {
+            if (!VerifyWitnessProgram(*witness, witnessversion, witnessprogram, flags, checker, serror)) {
                 return false;
             }
             // Bypass the cleanstack check at the end. The actual stack is obviously not clean
@@ -1622,7 +1538,6 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
 
         const valtype& pubKeySerialized = stack.back();
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
-        redeemScript << std::vector<unsigned char>(pubKey2.begin(), pubKey2.end()); // + 
         popstack(stack);
 
         if (!EvalScript(stack, pubKey2, flags, checker, SigVersion::BASE, serror))
@@ -1642,13 +1557,7 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
                     // reintroduce malleability.
                     return set_error(serror, SCRIPT_ERR_WITNESS_MALLEATED_P2SH);
                 }
-                // { + 
-                CScript hashInAddr (scriptPubKey.begin(), scriptPubKey.end());
-                hashInAddr.erase (hashInAddr.begin (), hashInAddr.begin () + 2);
-                hashInAddr.pop_back();
-                // } + 
-                // if (!VerifyWitnessProgram(*witness, witnessversion, witnessprogram, flags, checker, serror)) { // 
-                if (!VerifyWitnessProgram(*witness, witnessversion, witnessprogram, hashInAddr, flags, checker, serror)) {
+                if (!VerifyWitnessProgram(*witness, witnessversion, witnessprogram, flags, checker, serror)) {
                     return false;
                 }
                 // Bypass the cleanstack check at the end. The actual stack is obviously not clean
@@ -1680,35 +1589,6 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
             return set_error(serror, SCRIPT_ERR_WITNESS_UNEXPECTED);
         }
     }
-
-    // { + 
-    if ((flags & SCRIPT_VERIFY_P2SH) && scriptPubKey.IsPayToScriptHash() && ! hadWitness) {
-        CScript hashInAddr(scriptPubKey.begin(), scriptPubKey.end());
-        hashInAddr.erase(hashInAddr.begin(), hashInAddr.begin() + 2);
-        hashInAddr.pop_back();
-        /*
-        if (LogAcceptCategory((BCLog::TX))) {
-            LogPrintf ("Hash in addr: ");
-            for (unsigned char x: hashInAddr) {
-                LogPrintf ("%02X", x);
-            }
-            LogPrintf ("\n");
-
-            LogPrintf ("redeemScript: ");
-            for (unsigned char x: redeemScript) {
-                LogPrintf ("%02X", x);
-            }
-            LogPrintf ("\n");
-        }
-        */
-
-        if (! CheckHashedScript(hashInAddr, redeemScript)) {
-            // LogPrint (BCLog::TX, "Script hash (P2SH) check failed\n");
-            return set_error(serror, SCRIPT_ERR_REDEEM_SCRIPT_INCONSISTENT);
-        }
-        // LogPrint (BCLog::TX, "Script hash (P2SH) check passed\n");
-    }
-    // } + 
 
     return set_success(serror);
 }
@@ -1759,5 +1639,6 @@ size_t CountWitnessSigOps(const CScript& scriptSig, const CScript& scriptPubKey,
 
     return 0;
 }
+
 
 

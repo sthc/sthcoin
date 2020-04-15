@@ -500,14 +500,4 @@ inline bool IsBlockPruned(const CBlockIndex* pblockindex)
     return (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0);
 }
 
-// { + 
-extern std::atomic_bool g_is_scripts_loaded;
-
-/** Dump the script pairs to disk. */
-bool DumpScripts();
-
-/** Load the script pairs from disk. */
-bool LoadScripts();
-// } + 
-
 #endif // STHCOIN_VALIDATION_H
