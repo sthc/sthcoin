@@ -228,6 +228,12 @@ void Shutdown()
         DumpMempool();
     }
 
+    // { + 
+    if (g_is_dows_hash_cache_loaded) {
+        DumpDowsHashCache();
+    }
+    // } + 
+
     if (fFeeEstimatesInitialized)
     {
         ::feeEstimator.FlushUnconfirmed();
@@ -513,7 +519,8 @@ void SetupServerArgs()
     gArgs.AddArg("-rpcthreads=<n>", strprintf("Set the number of threads to service RPC calls (default: %d)", DEFAULT_HTTP_THREADS), false, OptionsCategory::RPC);
     gArgs.AddArg("-rpcuser=<user>", "Username for JSON-RPC connections", false, OptionsCategory::RPC);
     gArgs.AddArg("-rpcworkqueue=<n>", strprintf("Set the depth of the work queue to service RPC calls (default: %d)", DEFAULT_HTTP_WORKQUEUE), true, OptionsCategory::RPC);
-    gArgs.AddArg("-server", "Accept command line and JSON-RPC commands", false, OptionsCategory::RPC);
+    // gArgs.AddArg("-server", "Accept command line and JSON-RPC commands", false, OptionsCategory::RPC);
+    gArgs.AddArg("-server", "Accept command line and JSON-RPC commands", true, OptionsCategory::RPC); // 
 
 #if HAVE_DECL_DAEMON
     gArgs.AddArg("-daemon", "Run in the background as a daemon and accept commands", false, OptionsCategory::OPTIONS);
@@ -1287,7 +1294,8 @@ bool AppInitMain()
      * that the server is there and will be ready later).  Warmup mode will
      * be disabled when initialisation is finished.
      */
-    if (gArgs.GetBoolArg("-server", false))
+    // if (gArgs.GetBoolArg("-server", false))
+    if (gArgs.GetBoolArg("-server", true)) // & 
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
         if (!AppInitServers())
@@ -1435,6 +1443,15 @@ bool AppInitMain()
     }
     LogPrintf("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of unused mempool space)\n", nCoinCacheUsage * (1.0 / 1024 / 1024), nMempoolSizeMax * (1.0 / 1024 / 1024));
+
+    // { + 
+    if (!g_is_dows_hash_cache_loaded && !ShutdownRequested()) {
+        LOCK(cs_main);
+        LoadDowsHashCache();
+        g_is_dows_hash_cache_loaded = !ShutdownRequested();
+        last_dows_cache_save_time = std::chrono::system_clock::now();
+    }
+    // } + 
 
     bool fLoaded = false;
     while (!fLoaded && !ShutdownRequested()) {

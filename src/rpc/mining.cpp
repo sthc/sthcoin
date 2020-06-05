@@ -132,7 +132,7 @@ UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGen
         //  & {
         nCount = 0;
         pblock->nNonce = ((unsigned int) GetRandInt (2097151)) << 11;  // 2097151 = 2^21 = 2 ^ (32 - Log_2 (nInnerLoopCount))
-        while (nMaxTries > 0 && nCount < nInnerLoopCount && !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) {
+        while (nMaxTries > 0 && nCount < nInnerLoopCount && !CheckProofOfWork(pblock->GetTestHash(), pblock->nBits, Params().GetConsensus())) {
             ++ nCount;
             ++ pblock->nNonce;
             --nMaxTries;

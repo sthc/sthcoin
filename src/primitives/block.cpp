@@ -15,6 +15,11 @@
 uint256 CBlockHeader::GetPlainHash() const {
     return SerializeHash(*this);
 }
+
+uint256 CBlockHeader::GetTestHash(bool debug) const
+{
+    return DowsHash(SerializeHash(*this), debug, true);
+}
 // } + 
 
 

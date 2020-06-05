@@ -2,6 +2,7 @@
 // Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// & 
 
 #include <validation.h>
 
@@ -3602,6 +3603,13 @@ bool ProcessNewBlock(const CChainParams& chainparams, const std::shared_ptr<cons
     CValidationState state; // Only used to report errors, not invalidity - ignore it
     if (!g_chainstate.ActivateBestChain(state, chainparams, pblock))
         return error("%s: ActivateBestChain failed (%s)", __func__, FormatStateMessage(state));
+
+    auto gap = std::chrono::duration_cast<std::chrono::seconds>
+      (std::chrono::system_clock::now() - last_dows_cache_save_time);
+    if (gap.count () >= 86400) {
+      DumpDowsHashCache();
+      last_dows_cache_save_time = std::chrono::system_clock::now();
+    }
 
     return true;
 }

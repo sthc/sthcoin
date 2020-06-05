@@ -7,9 +7,19 @@
 #include <crypto/hmac_sha512.h>
 
 // { + 
+#include <array>
 #include <mutex>
+#include <atomic>
+#include <map>
+#include <thread>
+#include <utiltime.h>
+#include <shutdown.h>
+#include <util.h>
+#include <clientversion.h>
+#include <streams.h>
+#include <sync.h>
 
-// #define LOG_HASH
+//#define LOG_HASH
 #ifdef  LOG_HASH
 #include <logging.h> // May fail at cross compilation for Windows
 #endif
@@ -24,13 +34,25 @@ extern "C"
 #include <stdio.h>
 }
 
-static uint32_t g_hashBase[HASH_BASE_SIZE];  // Written only once at the beginning of the application
-
 #define MAX_STMT_NUM       12
 #define MIN_STMT_NUM       8
 #define FUNC_COUNT     16  // Number of functions in the hashing code
 #define OP_COUNT       10   // total number of operations
 #define CALL_WEIGHT    2   // the larger, the more likely function calls
+#define DOWS_HASH_CACHE_CHECKSUM_SIZE  8
+
+typedef std::array<char, 32> hash256_array;
+typedef std::array<char, DOWS_HASH_CACHE_CHECKSUM_SIZE> dows_hash_cache_checksum_t;
+typedef std::map<hash256_array, hash256_array> dows_hash_cache_t;
+extern CCriticalSection cs_main;
+
+static uint32_t g_hashBase[HASH_BASE_SIZE];  // Written only once at the beginning of the application
+std::atomic<bool> dowsHashLock(false);
+dows_hash_cache_t dowsHashCache;
+static const uint64_t DOWS_HASH_CACHE_VERSION = 1;
+std::atomic_bool g_is_dows_hash_cache_loaded{false};
+std::chrono::time_point<std::chrono::system_clock> last_dows_cache_save_time;
+CCriticalSection cs_dows_cache_save;
 
 // } + 
 
@@ -676,14 +698,49 @@ void ShuffleHash256 (lua_State * L, uint8_t * hash)
   }
 }
 
+inline void GetDowsHashCacheLock ()
+{
+    for (;;) {
+        auto old = dowsHashLock.exchange(true);
+        if (! old) return;
+    }
+}
 
-uint256 DowsHash(uint256 result, bool debug)
+uint256 DowsHash(uint256 result, bool debug, bool test)
 {
 #ifdef  LOG_HASH
   if (debug) {
         LogPrint(BCLog::HASH, "Plain hash = %s\n", result.ToString());
     }
 #endif
+
+  uint256 rawHash;
+
+  if (! test) {
+      hash256_array rawHashArray;
+
+      memcpy(rawHashArray.data(), result.begin(), 32);
+      memcpy(rawHash.begin(), result.begin(), 32);
+      GetDowsHashCacheLock();
+
+      // If the DOWS hash is in the cache, use it instead of recalculation
+
+      auto r = dowsHashCache.find(rawHashArray);
+      dowsHashLock.store(false);
+
+      if (r != dowsHashCache.end()) {
+#ifdef  LOG_HASH
+          LogPrint(BCLog::HASH, "DOWS hash found in cache for %s\n", result.ToString());
+#endif
+          memcpy(result.begin(), r->second.data(), 32);
+          return result;
+      }
+#ifdef  LOG_HASH
+      else {
+          LogPrint(BCLog::HASH, "DOWS hash not in cache for %s\n", result.ToString());
+      }
+#endif
+  }
 
   uint8_t h[32];
   char code[100000];
@@ -724,6 +781,7 @@ uint256 DowsHash(uint256 result, bool debug)
 
   ShuffleHash256(L, (uint8_t *) h);
   lua_close (L);
+
   CHash256().Write (result.begin(), 32).Write (h, 32).Finalize(result.begin());
   memcpy (h, result.begin(), 32);
   for (i = 0; i < 32; i += 4) {
@@ -737,9 +795,8 @@ uint256 DowsHash(uint256 result, bool debug)
   CPCG32 pcg32 (seed, incr);
   for (i = 0; i < HASH_BASE_USE_COUNT; ++ i) {
     uint32_t n = pcg32.pcg32() % HASH_BASE_SIZE_IN_BYTES;
-
     if (n <= HASH_BASE_SIZE_IN_BYTES - 32) {
-      h256.Write(((uint8_t *) g_hashBase) + n, 32);
+      h256.Write (((uint8_t *) g_hashBase) + n, 32);
       continue;
     }
 
@@ -747,9 +804,16 @@ uint256 DowsHash(uint256 result, bool debug)
     for (uint32_t j = 0; j < 32; ++ j) {
       b[j] = ((uint8_t *) g_hashBase)[(n + j) % HASH_BASE_SIZE_IN_BYTES];
     }
-    h256.Write(b, 32);
+    h256.Write (b, 32);
   }
   h256.Finalize(result.begin());
+
+  if (! test) {
+      AddToDowsHashCache(rawHash, result);
+#ifdef  LOG_HASH
+      LogPrint(BCLog::HASH, "DOWS hash added for %s\n", result.ToString());
+#endif
+  }
 
 #ifdef  LOG_HASH
   if (debug) {
@@ -757,9 +821,132 @@ uint256 DowsHash(uint256 result, bool debug)
         CHash256().Write ((unsigned char *) code, strlen (code)).Finalize(check.begin());
         LogPrint(BCLog::HASH, "Code hash = %s\n", check.ToString());
         LogPrint(BCLog::HASH, "LUA hash = %s\n", result.ToString());
-    }
+  }
 #endif
   return result;
+}
+
+
+void AddToDowsHashCache (uint256 & rawHash, uint256 & dowsHash)
+{
+    hash256_array rawHashArray, dowsHashArray;
+
+    memcpy (rawHashArray.data (), rawHash.begin (), 32);
+    memcpy (dowsHashArray.data (), dowsHash.begin (), 32);
+
+    GetDowsHashCacheLock();
+    dowsHashCache.emplace (rawHashArray, dowsHashArray);
+    dowsHashLock.store(false);
+}
+
+void CalculateDowsHashCacheChecksum (hash256_array k, hash256_array v, dows_hash_cache_checksum_t & checksum)
+{
+    uint256 hash;
+    CSHA256().Write((unsigned char *) k.data(), k.size()).Write((unsigned char *) v.data(), v.size ()).Finalize(hash.begin());
+    memcpy (checksum.data(), hash.begin (), DOWS_HASH_CACHE_CHECKSUM_SIZE);
+}
+
+/** Load the script pairs from disk. */
+bool LoadDowsHashCache (void)
+{
+    FILE* filestr = fsbridge::fopen(GetDataDir() / "hash.dat", "rb");
+    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+    if (file.IsNull()) {
+        LogPrintf("Failed to open hash file from disk. Continuing anyway.\n");
+        return false;
+    }
+
+    uint64_t count = 0;
+    uint64_t num, n;
+
+    try {
+        uint64_t version;
+        file >> version;
+        if (version != DOWS_HASH_CACHE_VERSION) {
+            return false;
+        }
+        file >> num;
+        n = num;
+        {
+            while (num) {
+                hash256_array k, v;
+                dows_hash_cache_checksum_t cs1, cs2;
+                file.read (k.data (), k.size());
+                file.read (v.data (), v.size());
+                file.read (cs1.data (), cs1.size ());
+                CalculateDowsHashCacheChecksum(k, v, cs2);
+                if (memcmp(cs1.data (), cs2.data (), DOWS_HASH_CACHE_CHECKSUM_SIZE) == 0) {
+                    GetDowsHashCacheLock();
+                    dowsHashCache.emplace(k, v);
+                    dowsHashLock.store(false);
+                    ++count;
+                }
+                -- num;
+                if (ShutdownRequested())
+                    return false;
+            }
+        }
+        file.fclose ();
+    } catch (const std::exception& e) {
+        LogPrintf("Failed to deserialize hash data on disk: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+
+    LogPrintf("Imported hashes from disk: %i succeeded, %i missed\n", count, n - count);
+    return true;
+}
+
+#define MICRO 0.000001
+
+bool DumpDowsHashCache(void)
+{
+    int64_t start = GetTimeMicros();
+    dows_hash_cache_t dowsHashCacheCopy;
+
+    {
+        LOCK(cs_main);
+        for (const auto &i :  dowsHashCache) {
+            dowsHashCacheCopy[i.first] = i.second;
+        }
+    }
+
+    int64_t mid = GetTimeMicros();
+
+    try {
+        LOCK (cs_dows_cache_save);
+        FILE* filestr = fsbridge::fopen(GetDataDir() / "hash.dat.new", "wb");
+        if (!filestr) {
+            return false;
+        }
+
+        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+
+        uint64_t version = DOWS_HASH_CACHE_VERSION;
+        file << version;
+
+        file << (uint64_t) dowsHashCacheCopy.size();
+        for (const auto& i : dowsHashCacheCopy) {
+            const auto & k = i.first;
+            const auto & v = i.second;
+            file.write (k.data (), k.size ());
+            file.write (v.data (), v.size ());
+            dows_hash_cache_checksum_t cs;
+            CalculateDowsHashCacheChecksum(k, v, cs);
+            file.write (cs.data (), cs.size ());
+        }
+
+        if (!FileCommit(file.Get()))
+            throw std::runtime_error("FileCommit failed");
+        file.fclose();
+        RenameOver(GetDataDir() / "hash.dat.new", GetDataDir() / "hash.dat");
+        int64_t last = GetTimeMicros();
+        LogPrintf("Dumped %d hashes: %gs to copy, %gs to dump\n", dowsHashCacheCopy.size (), (mid-start)*MICRO, (last-mid)*MICRO);
+    } catch (const std::exception& e) {
+        LogPrintf("Failed to dump hashes: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+    return true;
+
 }
 
 // } + 

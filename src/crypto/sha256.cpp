@@ -645,6 +645,64 @@ CSHA256::CSHA256() : bytes(0)
     sha256::Initialize(s);
 }
 
+// { + 
+void CSHA256::PrintData (const unsigned char* data, size_t len)
+{
+    for (int i = 0; i < len; ++ i) {
+        printf("%02X", data[i]);
+    }
+}
+
+
+void CSHA256::Show()
+{
+    printf ("%llu, ", bytes);
+    PrintData ((const unsigned char *) s, 8);
+    printf (", ");
+    PrintData (buf, 64);
+    printf ("\n");
+}
+
+CSHA256& CSHA256::Write_N_Log (const unsigned char* data, size_t len)
+{
+    printf ("Write: ");
+    PrintData (data, len);
+    printf ("\n");
+
+    const unsigned char* end = data + len;
+    size_t bufsize = bytes % 64;
+    if (bufsize && bufsize + len >= 64) {
+        // Fill the buffer, and process it.
+        memcpy(buf + bufsize, data, 64 - bufsize);
+        bytes += 64 - bufsize;
+        data += 64 - bufsize;
+        Transform(s, buf, 1);
+        bufsize = 0;
+
+        printf ("Step 1:\n");
+        Show ();
+    }
+    if (end - data >= 64) {
+        size_t blocks = (end - data) / 64;
+        Transform(s, data, blocks);
+        data += 64 * blocks;
+        bytes += 64 * blocks;
+
+        printf ("Step 2:\n");
+        Show ();
+    }
+    if (end > data) {
+        // Fill the buffer with what remains.
+        memcpy(buf + bufsize, data, end - data);
+        bytes += end - data;
+
+        printf ("Step 3:\n");
+        Show ();
+    }
+    return *this;
+}
+// } + 
+
 CSHA256& CSHA256::Write(const unsigned char* data, size_t len)
 {
     const unsigned char* end = data + len;

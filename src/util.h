@@ -284,6 +284,11 @@ public:
     bool IsArgKnown(const std::string& key) const;
 };
 
+// { + 
+#define DEFAULT_RPC_USERNAME    "sthcoinuser"
+#define DEFAULT_RPC_PASSWORD    "sthcoinpassword"
+// } + 
+
 extern ArgsManager gArgs;
 
 /**

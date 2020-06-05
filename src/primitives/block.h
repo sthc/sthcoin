@@ -17,6 +17,8 @@
  * in the block is a special one that creates a new coin owned by the creator
  * of the block.
  */
+
+
 class CBlockHeader
 {
 public:
@@ -64,6 +66,7 @@ public:
     }
 
     uint256 GetHash(bool debug = false) const; // & 
+    uint256 GetTestHash(bool debug = false) const; // + 
     uint256 GetPlainHash() const; // + 
 
     int64_t GetBlockTime() const
@@ -117,6 +120,7 @@ public:
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
+        block.nChainId       = nChainId; // + 
         return block;
     }
 

@@ -213,7 +213,8 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
 
 static bool InitRPCAuthentication()
 {
-    if (gArgs.GetArg("-rpcpassword", "") == "")
+    // if (gArgs.GetArg("-rpcpassword", "") == "")
+    if (gArgs.GetArg("-rpcpassword", DEFAULT_RPC_PASSWORD) == "") // & 
     {
         LogPrintf("No rpcpassword set - using random cookie authentication.\n");
         if (!GenerateAuthCookie(&strRPCUserColonPass)) {
@@ -224,7 +225,8 @@ static bool InitRPCAuthentication()
         }
     } else {
         LogPrintf("Config options rpcuser and rpcpassword will soon be deprecated. Locally-run instances may remove rpcuser to use cookie-based auth, or may be replaced with rpcauth. Please see share/rpcauth for rpcauth auth generation.\n");
-        strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
+        // strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
+        strRPCUserColonPass = gArgs.GetArg("-rpcuser", DEFAULT_RPC_USERNAME) + ":" + gArgs.GetArg("-rpcpassword", DEFAULT_RPC_PASSWORD); // & 
     }
     if (gArgs.GetArg("-rpcauth","") != "")
     {

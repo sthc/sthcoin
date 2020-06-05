@@ -24,6 +24,10 @@ public:
     CSHA256& Write(const unsigned char* data, size_t len);
     void Finalize(unsigned char hash[OUTPUT_SIZE]);
     CSHA256& Reset();
+
+    void PrintData (const unsigned char* data, size_t len); // + 
+    CSHA256& Write_N_Log (const unsigned char* data, size_t len); // + 
+    void Show (); // + 
 };
 
 /** Autodetect the best available SHA256 implementation.

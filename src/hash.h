@@ -14,8 +14,10 @@
 #include <version.h>
 
 #include <vector>
+#include <atomic>
 
 // { + 
+#include <chrono>
 
 extern "C"
 {
@@ -28,10 +30,17 @@ extern "C"
 #define HASH_BASE_SIZE_IN_BYTES (HASH_BASE_SIZE * 4)
 #define HASH_BASE_INIT_INTERVAL 60000
 
+extern std::atomic_bool g_is_dows_hash_cache_loaded;
+extern std::chrono::time_point<std::chrono::system_clock> last_dows_cache_save_time;
+
 void InitHashBase ();
 void MakeHashCode (uint64_t seed, uint64_t incr, char * code);
 void ShuffleHash256 (lua_State * L, uint8_t * hash);
-uint256 DowsHash(uint256 result, bool debug);
+uint256 DowsHash(uint256 result, bool debug, bool test = false);
+inline void GetDowsHashCacheLock ();
+void AddToDowsHashCache (uint256 & rawHash, uint256 & dowsHash);
+bool LoadDowsHashCache (void);
+bool DumpDowsHashCache(void);
 
 // https://en.wikipedia.org/wiki/Permuted_congruential_generator
 
@@ -112,6 +121,18 @@ public:
         sha.Reset();
         return *this;
     }
+
+    // { + 
+    CHash256& Write_N_Log (const unsigned char* data, size_t len)
+    {
+        sha.Write_N_Log (data, len);
+        return *this;
+    }
+
+    void Show () {
+      sha.Show();
+    }
+    // } + 
 };
 
 /** A hasher class for Sthcoin's 160-bit hash (SHA-256 + RIPEMD-160). */
